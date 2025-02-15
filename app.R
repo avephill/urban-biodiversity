@@ -6,7 +6,6 @@ library(bsicons)
 library(gt)
 library(colourpicker)
 library(glue)
-
 library(ggplot2)
 library(readr)
 library(dplyr)
@@ -45,7 +44,7 @@ ui <- page_sidebar(
       col_widths = c(11, 1)),
       fill = FALSE
   ),
-  
+
   textOutput("agent"),
 
 
@@ -85,10 +84,10 @@ ui <- page_sidebar(
   sidebar = sidebar(
     selectInput(
     "select",
-    "Select an LLM:", 
+    "Select an LLM:",
     list("LLama3" = "llama3",
          #"OLMO2 (AllenAI)" = "olmo",
-         "Gorilla (UC Berkeley)" = "gorilla" 
+         "Gorilla (UC Berkeley)" = "gorilla"
         )
   ),
 
@@ -127,7 +126,7 @@ filter_column <- function(full_data, filtered_data, id_col = "FIPS") {
   values <- full_data |>
     inner_join(filtered_data, copy = TRUE) |>
     pull(id_col)
-  # maplibre syntax for the filter of PMTiles  
+  # maplibre syntax for the filter of PMTiles
   list("in", list("get", id_col), list("literal", values))
 }
 
@@ -144,7 +143,7 @@ server <- function(input, output, session) {
   chart1 <- chart1_data |>
     ggplot(aes(mean_svi)) + geom_density(fill="darkred") +
     ggtitle("County-level vulnerability nation-wide")
-  
+
   data <- reactiveValues(df = tibble())
   output$chart1 <- renderPlot(chart1)
 
@@ -252,9 +251,9 @@ server <- function(input, output, session) {
           filter = filter_column(svi, data$df, "FIPS"),
           fill_opacity = 0.5,
           fill_color = interpolate(column = "RPL_THEMES",
-                                  values = c(0, 1),
-                                  stops = c("lightpink", "darkred"),
-                                  na_color = "lightgrey")
+                                   values = c(0, 1),
+                                   stops = c("lightpink", "darkred"),
+                                   na_color = "lightgrey")
         )
     }
   m |>

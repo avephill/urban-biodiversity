@@ -1,69 +1,55 @@
 ## Illustrate/test core app functionality without shiny
 
-library(tidyverse)
+library(dplyr)
 library(duckdbfs)
+
 library(mapgl)
-library(ellmer)
 library(glue)
 
-repo <- "https://data.source.coop/cboettig/social-vulnerability"
-pmtiles <- glue("{repo}/svi2020_us_tract.pmtiles")
-parquet <- glue("{repo}/svi2020_us_tract.parquet")
-svi <- open_dataset(parquet, tblname = "svi") |> filter(RPL_THEMES > 0)
+duckdbfs::load_h3()
+duckdbfs::load_spatial()
 
-schema <- read_file("schema.yml")
-system_prompt <- glue::glue(readr::read_file("system-prompt.md"),
-                            .open = "<", .close = ">")
-
-
-
-# Or optionally test with cirrus
-chat <- ellmer::chat_vllm(
-  base_url = "https://llm.cirrus.carlboettiger.info/v1/",
-  model = "kosbu/Llama-3.3-70B-Instruct-AWQ",
-  api_key = Sys.getenv("CIRRUS_LLM_KEY"),
-  system_prompt = system_prompt,
-  api_args = list(temperature = 0)
-)
-
-# or use the NRP model
-chat <- ellmer::chat_vllm(
-  base_url = "https://llm.nrp-nautilus.io/",
-  model = "llama3",
-  api_key = Sys.getenv("NRP_API_KEY"),
-  system_prompt = system_prompt,
-  api_args = list(temperature = 0)
-)
+sf = open_dataset("https://minio.carlboettiger.info/public-census/year=2022/tracts-hex-z10.parquet") |>
+  filter(STATE == "California", COUNTY == "San Francisco County") |>
+  mutate(h10 = toupper(unnest(h10)),
+         h0 = h3_cell_to_parent(h10, 0L)) |>
+  mutate(h0 = upper(as.character(h0)))
 
 
-# Test a chat-based response
-chat$chat("Which columns describes racial components of social vulnerability?")
-## A query-based response
-stream <- chat$chat("Which counties in California have the highest average social vulnerability?")
-response <- jsonlite::fromJSON(stream)
+h0 = sf |> distinct(h0) |> pull(h0)
+tiles = paste0("https://minio.carlboettiger.info/public-gbif/hex/h0=", h0, "/part0.parquet")
+gbif = open_dataset(tiles) |> select(class, species, h10)
 
-con <- duckdbfs::cached_connection()
-filtered_data <- DBI::dbGetQuery(con, response$query)
 
-filter_column <- function(full_data, filtered_data, id_col) {
-  if (nrow(filtered_data) < 1) return(NULL)
-  values <- full_data |>
-    inner_join(filtered_data, copy = TRUE) |>
-    pull(id_col)
-  # maplibre syntax for the filter of PMTiles  
-  list("in", list("get", id_col), list("literal", values))
-}
+sf_birds = sf |>
+  inner_join(gbif, 'h10') |>
+  filter(class == "Aves") |>
+  select(c('species', 'FIPS', 'geom')) |>
+  distinct()
 
-maplibre(center = c(-102.9, 41.3), zoom = 3) |>
-    add_fill_layer(
-        id = "svi_layer",
-        source = list(type = "vector", url  = paste0("pmtiles://", pmtiles)),
-        source_layer = "SVI2000_US_tract",
-        filter = filter_column(full_data, filtered_data, "FIPS"),
-        fill_opacity = 0.5,
-        fill_color = interpolate(column = "RPL_THEMES",
-                                values = c(0, 1),
-                                stops = c("#e19292c0", "darkblue"),
-                                na_color = "lightgrey")
+total = sf_birds |> distinct(species) |> count() |> pull(n)
+
+gdf = sf_birds |>
+  count(FIPS, geom) |>
+  mutate(score = n / {total}) |>
+  to_sf(crs = "EPSG:4326")
+
+
+m <- maplibre(center = c(-122.5, 37.8), zoom = 9) |>
+  add_source(id = "birds", gdf) |>
+  add_layer("birds-layer",
+            type = "fill",
+            source = "birds",
+            tooltip = "n",
+            paint = list(
+              "fill-color" = interpolate(column = "score",
+                                         values = c(0, 1),
+                                         stops = c("lightgreen", "darkgreen"),
+                                         na_color = "lightgrey"),
+              "fill-opacity" = 0.4
+            )
+
     )
 
+library(htmlwidgets)
+htmlwidgets::saveWidget(m, "example.html")
