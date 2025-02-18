@@ -1,5 +1,3 @@
-## Illustrate/test core app functionality without shiny
-
 library(dplyr)
 library(duckdbfs)
 library(ggplot2)
@@ -38,7 +36,7 @@ total = sf_birds |> distinct(species) |> count() |> pull(n)
 
 bird_counts = sf_birds |>
   count(FIPS, geom) |>
-  mutate(bird_richness_fraction = n / {total})
+  mutate(richness = n / {total})
 
 ces_poverty = ces |> select("Poverty", "FIPS")
 combined <- svi |>
@@ -51,27 +49,3 @@ combined <- svi |>
                            labels = c("0-25", "25-50", "50-75", "75-100")))
  
   
-gdf = combined |>  to_sf(crs = "EPSG:4326")
-
-ggplot(gdf, aes(x = svi_bin, y = bird_richness_fraction, fill = svi_bin)) +
-  geom_boxplot(alpha = 0.5) +
-  geom_jitter(width = 0.2, alpha = 0.5) + theme_bw(base_size = 18)
-
-m <- maplibre(center = c(-122.5, 37.8), zoom = 9) |>
-  add_source(id = "birds", gdf) |>
-  add_layer("birds-layer",
-            type = "fill",
-            source = "birds",
-            tooltip = "richness",
-            paint = list(
-              "fill-color" = interpolate(column = "richness",
-                                         values = c(0, 1),
-                                         stops = c("lightgreen", "darkgreen"),
-                                         na_color = "lightgrey"),
-              "fill-opacity" = 0.4
-            )
-
-    )
-
-library(htmlwidgets)
-htmlwidgets::saveWidget(m, "example.html")
