@@ -4,23 +4,16 @@ library(ggplot2)
 library(dplyr)
 library(mapgl)
 library(duckdbfs)
+library(shinybusy)
+source("preprocess.R")
 
-
-css <-
-  HTML(paste0("<link rel='stylesheet' type='text/css' ",
-              "href='https://demos.creative-tim.com/",
-              "material-dashboard/assets/css/",
-              "material-dashboard.min.css?v=3.2.0'>"))
 
 
 # Define the UI
 ui <- page_sidebar(
   fillable = FALSE, # do not squeeze to vertical screen space
-  tags$head(css),
+  #tags$head(css),
   titlePanel("Demo App"),
-
-  # chat_box("which tracts have the highest vulnerability"),
-  # textOutput("agent"),
 
   layout_columns(
     card(maplibreOutput("map")),
@@ -33,51 +26,66 @@ ui <- page_sidebar(
   ),
 
   sidebar = sidebar(
-    open = FALSE, width = 150,
+    open = TRUE, width = 250,
+    selectInput("state", "Select state:", states, selected = "California"),
+    uiOutput("county_selector"),
+    selectInput("rank", "Select taxon rank:", rank, selected = "class"),
+    textInput("taxon", "taxonomic name:", "Aves"),
+    input_dark_mode(id = "mode"),
     input_switch("svi", "Social Vulnerability", value = TRUE),
-    theme = bs_theme(version = "5")
-  )
+  ),
+  theme = bs_theme(version = "5")
 )
-
-source("preprocess.R")
-
 
 # Define the server
 server <- function(input, output, session) {
 
-  gdf = combined |> to_sf(crs = "EPSG:4326")
+  # Create a dropdown for counties based on the state selected:
+  output$county_selector <- renderUI({
+    req(input$state)
+    counties <- get_counties(input$state)
+    selectInput("county", "Select County:", choices = counties)
+  })
 
 
   output$map <- renderMaplibre({
-
-    m <- maplibre(center = c(-122.5, 37.8), zoom = 9) |>
-      add_source(id = "birds", gdf) |>
-      add_layer("birds-layer",
+    gdf <- combined_sf(input$state, input$county, input$rank, input$taxon)
+    m <- 
+      maplibre(bounds = gdf) |> 
+      add_source(id = "richness_source", gdf) |>
+      add_layer("richness_layer",
                 type = "fill",
-                source = "birds",
+                source = "richness_source",
                 tooltip = "richness",
                 paint = list(
-                  "fill-color" = interpolate(column = "richness",
-                                            values = c(0, 1),
-                                            stops = c("lightgreen",
-                                                      "darkgreen"),
-                                            na_color = "lightgrey"),
+                  "fill-color" = fill_color,
                   "fill-opacity" = 0.4
                 )
       )
-  m
+    m
   })
-
-  print(head(gdf))
 
   output$plot <- renderPlot(
     {
-      gdf |> as_tibble() |>
-      ggplot(aes(x = svi_bin, y = richness, fill = svi_bin)) +
-      geom_boxplot(alpha = 0.5) +
-      geom_jitter(width = 0.2, alpha = 0.5) + theme_bw(base_size = 18)
+      combined_sf(input$state, input$county, input$rank, input$taxon) |> 
+        as_tibble() |>
+        ggplot(aes(x = vulnerability, y = richness, fill = vulnerability)) +
+        geom_boxplot(alpha = 0.5) +
+        geom_jitter(width = 0.2, alpha = 0.5) + theme_bw(base_size = 18)
     }
   )
+
+  observeEvent(input$county, {
+
+      print(paste("Updating map for ", input$county))
+
+      gdf <- combined_sf(input$state, input$county, input$rank, input$taxon)
+      maplibre_proxy("map") |>
+        set_source("richness_layer", gdf) |> 
+        fit_bounds(gdf) |>
+        set_paint_property("richness_layer", "fill-color", "blue")
+  })
+
 }
 
 
