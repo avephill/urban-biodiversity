@@ -1,0 +1,21 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: shiny-ingress
+spec:
+  ingressClassName: haproxy
+  rules:
+    # Set the same URL for both host and tls.hosts.  include your namespace to avoid collisions?
+  - host: shiny-biodiversity.nrp-nautilus.io
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: shiny-svc
+            port:
+              number: 8080
+  tls:
+  - hosts:
+    - shiny-biodiversity.nrp-nautilus.io

@@ -6,6 +6,7 @@ colorTo: green
 sdk: docker
 pinned: false
 license: bsd-2-clause
+appPort: 8080
 ---
 
 

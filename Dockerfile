@@ -10,12 +10,13 @@ RUN install2.r --error \
     gt \
     markdown \
     shiny \
-    shinychat \
+    shinybusy \
     tidyverse \
-    colourpicker
+    colourpicker \
+    mapgl
 
-RUN installGithub.r cboettig/mapgl tidyverse/ellmer cboettig/duckdbfs
+RUN installGithub.r tidyverse/ellmer cboettig/duckdbfs
 
-COPY . .
+COPY app .
 
-CMD ["R", "--quiet", "-e", "shiny::runApp(host='0.0.0.0', port=7860)"]
+CMD ["R", "--quiet", "-e", "shiny::runApp(host='0.0.0.0', port=8080)"]
