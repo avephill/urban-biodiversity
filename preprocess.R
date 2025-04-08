@@ -22,6 +22,12 @@ aws_s3_endpoint <- "minio.carlboettiger.info"
 # use to populate selctors for state and county
 
 rank <- c("kingdom", "phylum", "class", "order", "family", "genus", "species")
+svi_themes = list(
+  "Overall Social Vulnerability" = "RPL_THEMES",
+  "Socio-economic status" = "RPL_THEME1",
+  "Household Characteristics" = "RPL_THEME2",
+  "Racial & Ethnic Minority Status" = "RPL_THEME3",
+  "Housing Type & Transportation" = "RPL_THEME4")
 
 get_states <- memoise(function() {
   glue::glue("https://{aws_public_endpoint}/public-social-vulnerability/2022/SVI2022_US_county.parquet") |>
@@ -97,14 +103,20 @@ gbif_richness_fraction <- function(gbif, aoi, rank = "class", taxon = "Aves") {
 compute_data <- function(state = "California",
                          county = "Alameda County",
                          rank = "class",
-                         taxon = "Aves") {
+                         taxon = "Aves",
+                         svi_metric = "RPL_THEMES") {
   aoi <- area_hexes(state, county)
   gbif <- get_gbif(aoi)
   richness <- gbif |> gbif_richness_fraction(aoi, rank, taxon)
 
   # Access SVI
   svi <- open_dataset(glue::glue("https://{aws_public_endpoint}/public-social-vulnerability/2022/SVI2022_US_tract.parquet")) |>
-         select("RPL_THEMES", "FIPS", "COUNTY") |> 
+         select("RPL_THEMES", 
+                "RPL_THEME1", 
+                "RPL_THEME2",
+                "RPL_THEME3",
+                "RPL_THEME4",
+                "FIPS", "COUNTY") |> 
          mutate(RPL_THEMES = ifelse(RPL_THEMES < 0, NA, RPL_THEMES))
 
   # Access CalEnviroScreen

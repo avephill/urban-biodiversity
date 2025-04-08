@@ -8,16 +8,26 @@ library(shinybusy)
 source("preprocess.R")
 
 
-
 # Define the UI
 ui <- page_sidebar(
   fillable = FALSE, # do not squeeze to vertical screen space
   #tags$head(css),
-  titlePanel("Demo App"),
+  titlePanel("GBIF Species Richness by Census Tract"),
   shinybusy::add_busy_spinner(),
+  includeMarkdown(
+    "Use the search bar in the map to look for a city or other region.
+    The app will plot species richness for the taxa selected by census
+    tract as a fraction of the total species richness (for the same
+    taxonomic group) observed in the county as a whole.  Mouse
+    over the map individual richness scores, scroll to zoom, drag to
+    pan, ctrl+click to alter angle.
+    In the side panel, the app will also plot social vulnerability
+    indicators by quantile vs the species
+    richness observed."),
+
   layout_columns(
     card(maplibreOutput("map")),
-    card(includeMarkdown("## Plot"),
+    card(includeMarkdown("## Social vulnerability"),
          plotOutput("plot")
          ),
     col_widths = c(8, 4),
@@ -27,30 +37,33 @@ ui <- page_sidebar(
 
   sidebar = sidebar(
     open = TRUE, width = 250,
-    selectInput("state", "Select state:", get_states(), selected = "California"),
-    uiOutput("county_selector"),
     selectInput("rank", "Select taxon rank:", rank, selected = "class"),
     textInput("taxon", "taxonomic name:", "Aves"),
+    selectInput("svi_themes", "Social vulnerability metric:", svi_themes),
+    textInput("state", "Selected state", "California"),
+    textInput("county", "Selected county", "Alameda County"),
+
+    #selectInput("state", "Selected state:", get_states(), selected = "California"),
+    #uiOutput("county_selector"),
     input_dark_mode(id = "mode"),
-    input_switch("svi", "Social Vulnerability", value = TRUE),
   ),
   theme = bs_theme(version = "5")
 )
 
 # Define the server
 server <- function(input, output, session) {
-
+  init <- reactiveValues(loaded = FALSE)
   # Create a dropdown for counties based on the state selected:
   output$county_selector <- renderUI({
     req(input$state)
     counties <- get_counties(input$state)
-    selectInput("county", "Select County:", choices = counties)
+    selectInput("county", "Selected County:", choices = counties)
   })
 
   output$map <- renderMaplibre({
 
     gdf <- combined_sf(input$state, input$county, input$rank, input$taxon)
-    maplibre(bounds = gdf) |> 
+    m <- maplibre(bounds = gdf, maxZoom = 12) |> 
       add_source(id = "richness_source", gdf) |>
       add_layer("richness_layer",
                 type = "fill",
@@ -59,17 +72,46 @@ server <- function(input, output, session) {
                 paint = list(
                   "fill-color" = viridis_pal("richness"),
                   "fill-opacity" = 0.4
-                )
-      )
+                ) 
+      ) |> 
+      add_geolocate_control() |> 
+      add_geocoder_control()
+
+
+  m
   })
+
+  observe( 
+    if (init$loaded) {
+      result <- input$map_geocoder$result
+      if (!is.null(result)) {
+        if (!is.null(result$features[[1]]$properties$address$county)) {
+          county <- result$features[[1]]$properties$address$county
+          state <- result$features[[1]]$properties$address$state
+          updateTextInput(session, "state", value = state)
+          updateTextInput(session, "county", value = county)
+          print(glue::glue("{state}, {county}"))
+        }
+      }
+    } else  {
+      init$loaded <- TRUE
+    }
+  )
 
   output$plot <- renderPlot(
     {
-      combined_sf(input$state, input$county, input$rank, input$taxon) |> 
-        as_tibble() |>
-        ggplot(aes(x = vulnerability, y = richness, fill = vulnerability)) +
+      df <- combined_sf(input$state, input$county, input$rank, input$taxon) |> 
+        as_tibble() |> na.omit()
+        ggplot(df, aes(x = vulnerability, y = richness, fill = vulnerability)) +
         geom_boxplot(alpha = 0.5) +
-        geom_jitter(width = 0.2, alpha = 0.5) + theme_bw(base_size = 18)
+        geom_jitter(width = 0.2, alpha = 0.5) + theme_bw(base_size = 18) + 
+        theme(legend.position = "none") +
+        labs(y = "species richness", x= "social vulnerability", 
+             caption = "Species richness by 2022 Census Tract
+                        as a fraction of species richness 
+                        observed in the county as a whole")
+
+      
     }
   )
 
