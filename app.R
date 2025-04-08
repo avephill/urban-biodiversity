@@ -14,20 +14,20 @@ ui <- page_sidebar(
   fillable = FALSE, # do not squeeze to vertical screen space
   #tags$head(css),
   titlePanel("Demo App"),
-
+  shinybusy::add_busy_spinner(),
   layout_columns(
     card(maplibreOutput("map")),
     card(includeMarkdown("## Plot"),
          plotOutput("plot")
          ),
     col_widths = c(8, 4),
-    row_heights = c("500px"),
-    max_height = "600px"
+    row_heights = c("700px"),
+    max_height = "900px"
   ),
 
   sidebar = sidebar(
     open = TRUE, width = 250,
-    selectInput("state", "Select state:", states, selected = "California"),
+    selectInput("state", "Select state:", get_states(), selected = "California"),
     uiOutput("county_selector"),
     selectInput("rank", "Select taxon rank:", rank, selected = "class"),
     textInput("taxon", "taxonomic name:", "Aves"),
@@ -47,22 +47,20 @@ server <- function(input, output, session) {
     selectInput("county", "Select County:", choices = counties)
   })
 
-
   output$map <- renderMaplibre({
+
     gdf <- combined_sf(input$state, input$county, input$rank, input$taxon)
-    m <- 
-      maplibre(bounds = gdf) |> 
+    maplibre(bounds = gdf) |> 
       add_source(id = "richness_source", gdf) |>
       add_layer("richness_layer",
                 type = "fill",
                 source = "richness_source",
                 tooltip = "richness",
                 paint = list(
-                  "fill-color" = fill_color,
+                  "fill-color" = viridis_pal("richness"),
                   "fill-opacity" = 0.4
                 )
       )
-    m
   })
 
   output$plot <- renderPlot(
@@ -76,14 +74,8 @@ server <- function(input, output, session) {
   )
 
   observeEvent(input$county, {
-
-      print(paste("Updating map for ", input$county))
-
-      gdf <- combined_sf(input$state, input$county, input$rank, input$taxon)
-      maplibre_proxy("map") |>
-        set_source("richness_layer", gdf) |> 
-        fit_bounds(gdf) |>
-        set_paint_property("richness_layer", "fill-color", "blue")
+#      gdf <- combined_sf(input$state, input$county, input$rank, input$taxon)
+#      maplibre_proxy("map") |> set_source("richness_layer", gdf) |> fit_bounds(gdf)
   })
 
 }
