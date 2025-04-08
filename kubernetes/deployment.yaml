@@ -3,27 +3,29 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: shiny-deployment
+  name: urbanbio-deployment
   labels:
-    k8s-app: shiny-app
+    k8s-app: urbanbio-app
 spec:
   replicas: 1
   selector:
     matchLabels:
-      k8s-app: shiny-app
+      k8s-app: urbanbio-app
   template:
     metadata:
       labels:
-        k8s-app: shiny-app
+        k8s-app: urbanbio-app
     spec:
       containers:
       - name: shiny
-        image:  ghcr.io/boettiger-lab/nautilus-shiny
+        image:  ghcr.io/boettiger-lab/urban-biodiversity
         imagePullPolicy: Always
         resources:
           requests:
-            cpu: 100m
-            memory: 2Gi
+            cpu: 6
+            memory: 6Gi
           limits:
-            cpu: 100m
-            memory: 2Gi
+            cpu: 6
+            memory: 6Gi
+
+

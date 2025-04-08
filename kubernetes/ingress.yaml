@@ -6,7 +6,7 @@ spec:
   ingressClassName: haproxy
   rules:
     # Set the same URL for both host and tls.hosts.  include your namespace to avoid collisions?
-  - host: shiny-biodiversity.nrp-nautilus.io
+  - host: urban-biodiversity.nrp-nautilus.io
     http:
       paths:
       - path: /
@@ -18,4 +18,4 @@ spec:
               number: 8080
   tls:
   - hosts:
-    - shiny-biodiversity.nrp-nautilus.io
+    - urban-biodiversity.nrp-nautilus.io

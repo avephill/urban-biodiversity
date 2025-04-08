@@ -1,9 +1,9 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: shiny-svc
+  name: urbanbio-svc
   labels:
-    k8s-app: shiny-svc
+    k8s-app: urbanbio-svc
 
 # ports.targetPort is the port exposed by the Docker container
 # ports.port is the port matched to the ingress
@@ -13,5 +13,5 @@ spec:
     protocol: TCP
     targetPort: 8080
   selector:
-    k8s-app: shiny-app
+    k8s-app: urbanbio-app
   type: ClusterIP
