@@ -50,3 +50,8 @@ rsconnect/
 
 .tmp
 .swp
+
+app/cache/
+cache/
+
+*secrets*

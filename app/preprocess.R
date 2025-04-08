@@ -5,7 +5,7 @@ library(mapgl)
 library(glue)
 library(memoise)
 
-CACHE <- "cache/"
+CACHE <-  tempdir() # "cache/"
 fs::dir_create("cache")
 css <- shiny::HTML(paste0("<link rel='stylesheet' type='text/css' href='https://demos.creative-tim.com/material-dashboard/assets/css/material-dashboard.min.css?v=3.2.0'>"))
 
@@ -28,6 +28,12 @@ svi_themes = list(
   "Household Characteristics" = "RPL_THEME2",
   "Racial & Ethnic Minority Status" = "RPL_THEME3",
   "Housing Type & Transportation" = "RPL_THEME4")
+
+
+svi_label <- function(svi_theme) {
+  labels <- names(svi_themes)
+  labels[svi_themes == svi_theme]
+}
 
 get_states <- memoise(function() {
   glue::glue("https://{aws_public_endpoint}/public-social-vulnerability/2022/SVI2022_US_county.parquet") |>
@@ -111,24 +117,23 @@ compute_data <- function(state = "California",
 
   # Access SVI
   svi <- open_dataset(glue::glue("https://{aws_public_endpoint}/public-social-vulnerability/2022/SVI2022_US_tract.parquet")) |>
-         select("RPL_THEMES", 
-                "RPL_THEME1", 
+         dplyr::select("RPL_THEMES",
+                "RPL_THEME1",
                 "RPL_THEME2",
                 "RPL_THEME3",
                 "RPL_THEME4",
                 "FIPS", "COUNTY") |> 
-         mutate(RPL_THEMES = ifelse(RPL_THEMES < 0, NA, RPL_THEMES))
+         dplyr::filter(!is.na(RPL_THEMES))
+#         mutate(RPL_THEMES = ifelse(RPL_THEMES < 0, NA, RPL_THEMES))
 
   # Access CalEnviroScreen
   # ces <- open_dataset(glue("https://{aws_public_endpoint}/public-calenviroscreen/ces_2021.parquet"), format="parquet")
   # ces_subset <- ces |> select("Poverty", "FIPS")
 
-  # Filter GBIF to our area-of-interest (h-index) and species of interest
-
   combined <- richness  |>
-    inner_join(svi, "FIPS")  |>
+    left_join(svi, "FIPS")  |>
   #  inner_join(ces_subset, "FIPS") |>
-    mutate(vulnerability = cut(RPL_THEMES, breaks = c(0, .25, .50, .75, 1), 
+    mutate(vulnerability = cut(.data[[svi_metric]], breaks = c(0, .25, .50, .75, 1), 
                             labels = c("Q1-Lowest", "Q2-Low", "Q3-Medium", "Q4-High")))   # |>
   #  mutate(poverty_bin = cut(Poverty, breaks = c(0, 25, 50, 75, 100), 
   #                          labels = c("0-25", "25-50", "50-75", "75-100")))
@@ -138,14 +143,17 @@ compute_data <- function(state = "California",
 }
 
 
-combined_sf <- memoise(function(state = "California", county = "Alameda County",
-                                rank = "class", taxon = "Aves")
+combined_sf <- memoise(function(state = "California", 
+                                county = "Alameda County",
+                                rank = "class",
+                                taxon = "Aves", 
+                                svi_metric = "RPL_THEMES")
   {
 
     if(is.null(county)) {
       county <- "Alameda County"
     }
-    combined <- compute_data(state, county, rank, taxon)
+    combined <- compute_data(state, county, rank, taxon, svi_metric)
     combined |> to_sf(crs = "EPSG:4326")
   },
   cache = cache_filesystem(CACHE)

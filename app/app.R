@@ -27,9 +27,7 @@ ui <- page_sidebar(
 
   layout_columns(
     card(maplibreOutput("map")),
-    card(includeMarkdown("## Social vulnerability"),
-         plotOutput("plot")
-         ),
+    card(plotOutput("plot")),
     col_widths = c(8, 4),
     row_heights = c("700px"),
     max_height = "900px"
@@ -39,7 +37,7 @@ ui <- page_sidebar(
     open = TRUE, width = 250,
     selectInput("rank", "Select taxon rank:", rank, selected = "class"),
     textInput("taxon", "taxonomic name:", "Aves"),
-    selectInput("svi_themes", "Social vulnerability metric:", svi_themes),
+    selectInput("svi_theme", "Social vulnerability metric:", svi_themes),
     textInput("state", "Selected state", "California"),
     textInput("county", "Selected county", "Alameda County"),
 
@@ -52,6 +50,13 @@ ui <- page_sidebar(
 
 # Define the server
 server <- function(input, output, session) {
+
+ 
+  observe(
+    print(paste("theme: ", svi_label(input$svi_theme)))
+  )
+
+
   init <- reactiveValues(loaded = FALSE)
   # Create a dropdown for counties based on the state selected:
   output$county_selector <- renderUI({
@@ -100,13 +105,20 @@ server <- function(input, output, session) {
 
   output$plot <- renderPlot(
     {
-      df <- combined_sf(input$state, input$county, input$rank, input$taxon) |> 
-        as_tibble() |> na.omit()
+      df <- combined_sf(input$state,
+                        input$county,
+                        input$rank,
+                        input$taxon,
+                        input$svi_theme) |> 
+        as_tibble() |> 
+        mutate(vulnerability = cut(.data[[input$svi_theme]], breaks = c(0, .25, .50, .75, 1), 
+               labels = c("Q1-Lowest", "Q2-Low", "Q3-Medium", "Q4-High"))) 
         ggplot(df, aes(x = vulnerability, y = richness, fill = vulnerability)) +
         geom_boxplot(alpha = 0.5) +
         geom_jitter(width = 0.2, alpha = 0.5) + theme_bw(base_size = 18) + 
         theme(legend.position = "none") +
-        labs(y = "species richness", x= "social vulnerability", 
+        labs(y = "species richness", x= "vulnerability",
+             title =  svi_label(input$svi_theme),
              caption = "Species richness by 2022 Census Tract
                         as a fraction of species richness 
                         observed in the county as a whole")
