@@ -6,7 +6,6 @@ library(glue)
 library(memoise)
 
 CACHE <-  tempdir() # "cache/"
-fs::dir_create("cache")
 css <- shiny::HTML(paste0("<link rel='stylesheet' type='text/css' href='https://demos.creative-tim.com/material-dashboard/assets/css/material-dashboard.min.css?v=3.2.0'>"))
 
 
