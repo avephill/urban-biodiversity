@@ -37,6 +37,7 @@ ui <- page_sidebar(
     open = TRUE, width = 250,
     selectInput("rank", "Select taxon rank:", rank, selected = "class"),
     textInput("taxon", "taxonomic name:", "Aves"),
+    selectInput("map_color", "Map variable:", c("richness", "counts", "vulnerability")),
     selectInput("svi_theme", "Social vulnerability metric:", svi_themes),
     textInput("state", "Selected state", "California"),
     textInput("county", "Selected county", "Alameda County"),
@@ -65,17 +66,28 @@ server <- function(input, output, session) {
     selectInput("county", "Selected County:", choices = counties)
   })
 
+
   output$map <- renderMaplibre({
 
+    if (input$map_color == "vulnerability"){
+      variable <- input$svi_theme
+    } else {
+      variable <- input$map_color
+    }
+
     gdf <- combined_sf(input$state, input$county, input$rank, input$taxon)
+
+
+    vmax <- max( max(gdf[[variable]]), 1) # normalize only needed for counts, otherwise 0-1 scale
+
     m <- maplibre(bounds = gdf, maxZoom = 12) |> 
       add_source(id = "richness_source", gdf) |>
       add_layer("richness_layer",
                 type = "fill",
                 source = "richness_source",
-                tooltip = "richness",
+                tooltip = variable,
                 paint = list(
-                  "fill-color" = viridis_pal("richness"),
+                  "fill-color" = viridis_pal(variable, max_v = vmax),
                   "fill-opacity" = 0.4
                 ) 
       ) |> 
@@ -133,11 +145,40 @@ server <- function(input, output, session) {
       
     }
   )
+  output$plot <- renderPlot(
+    {
+      df <- combined_sf(input$state,
+                        input$county,
+                        input$rank,
+                        input$taxon,
+                        input$svi_theme) |> 
+        as_tibble() |>
+        na.omit() |>
+        mutate(vulnerability = 
+                 cut(.data[[input$svi_theme]], 
+                     breaks = c(0, .25, .50, .75, 1), 
+                     labels = c("Q1-Lowest", "Q2-Low", "Q3-Medium", "Q4-High")
+                 )
+              )
 
-  observeEvent(input$county, {
+      df |>
+        ggplot(aes(x = vulnerability, y = counts, fill = vulnerability)) +
+        geom_boxplot(alpha = 0.5) +
+        geom_jitter(width = 0.2, alpha = 0.5) + theme_bw(base_size = 18) +
+        theme(legend.position = "none") +
+        labs(y = "sampling effort (counts)", x= "vulnerability",
+             title =  svi_label(input$svi_theme),
+             caption = "Species richness by 2022 Census Tract
+                        as a fraction of species richness 
+                        observed in the county as a whole")
+
+      
+  })
+
+#  observeEvent(input$county, {
 #      gdf <- combined_sf(input$state, input$county, input$rank, input$taxon)
 #      maplibre_proxy("map") |> set_source("richness_layer", gdf) |> fit_bounds(gdf)
-  })
+#  })
 
 }
 

@@ -94,14 +94,16 @@ gbif_richness_fraction <- function(gbif, aoi, rank = "class", taxon = "Aves") {
   species_area = aoi |>
     inner_join(gbif, 'h10') |>
     filter(.data[[rank]] == {taxon}) |>
-    select(c('species', 'FIPS', 'geom')) |>
-    distinct()
+    count(species, FIPS, geom, name = "counts")
 
   total = species_area |> distinct(species) |> count() |> pull(n)
-  richness = species_area |>
-    count(FIPS, geom) |>
-    mutate(richness = n / {total})
 
+  richness = species_area |>
+    group_by(FIPS, geom) |>
+    summarise(richness = n() / total, 
+              counts = sum(counts),
+              .groups = "drop")
+  
   richness
 }
 
@@ -159,8 +161,8 @@ combined_sf <- memoise(function(state = "California",
 )
 
 # Colormap
-greens = function() {
-  interpolate(column = "richness",
+greens = function(column = "richness") {
+  interpolate(column = column,
                          values = c(0, 1),
                          stops = c("#c7fcc7",
                                    "#004600"),
