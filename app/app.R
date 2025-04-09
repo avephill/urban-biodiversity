@@ -27,7 +27,7 @@ ui <- page_sidebar(
 
   layout_columns(
     card(maplibreOutput("map")),
-    card(plotOutput("plot")),
+    card(plotOutput("plot"), plotOutput("plot2")),
     col_widths = c(8, 4),
     row_heights = c("700px"),
     max_height = "900px"
@@ -145,7 +145,7 @@ server <- function(input, output, session) {
       
     }
   )
-  output$plot <- renderPlot(
+  output$plot2 <- renderPlot(
     {
       df <- combined_sf(input$state,
                         input$county,
@@ -164,13 +164,13 @@ server <- function(input, output, session) {
       df |>
         ggplot(aes(x = vulnerability, y = counts, fill = vulnerability)) +
         geom_boxplot(alpha = 0.5) +
-        geom_jitter(width = 0.2, alpha = 0.5) + theme_bw(base_size = 18) +
+        geom_jitter(width = 0.2, alpha = 0.5) + 
+        scale_y_log10() +
+        theme_bw(base_size = 18) +
         theme(legend.position = "none") +
         labs(y = "sampling effort (counts)", x= "vulnerability",
-             title =  svi_label(input$svi_theme),
-             caption = "Species richness by 2022 Census Tract
-                        as a fraction of species richness 
-                        observed in the county as a whole")
+             title =  "",
+             caption = "")
 
       
   })
