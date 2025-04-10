@@ -32,7 +32,10 @@ ui <- page_sidebar(
     row_heights = c("700px"),
     max_height = "900px"
   ),
-
+  card(
+      card_header("Errata"),
+      shiny::markdown(readr::read_file("footer.md")),
+  ),
   sidebar = sidebar(
     open = TRUE, width = 250,
     selectInput("rank", "Select taxon rank:", rank, selected = "class"),
