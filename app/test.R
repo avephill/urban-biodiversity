@@ -5,18 +5,14 @@ aoi <- area_hexes(state = "California",  county = "Alameda County")
 gbif <- get_gbif(aoi)
 richness <- gbif |> gbif_richness_fraction(aoi=aoi)
 
+aws_s3_endpoint <- "minio.carlboettiger.info"
 
-rank = "class"
-taxon = "Aves"
-species_area = aoi |>
-    inner_join(gbif, 'h10') |>
-    filter(.data[[rank]] == {taxon}) |>
-    count(species, FIPS, geom, name = "counts")
+latitude = 37.78506
+longitude = -122.7277
 
-  total = species_area |> distinct(species) |> count() |> pull(n)
 
-  richness = species_area |>
-    group_by(FIPS, geom) |>
-    summarise(richness = n() / total, 
-              counts = sum(counts),
-              .groups = "drop")
+open_dataset(glue::glue("https://{aws_public_endpoint}/public-social-vulnerability/2022-tracts-h3-z5.parquet")) |>
+      filter(h5 == h3_latlng_to_cell_string(latitude, longitude, 5L))  |> 
+      collect()
+})
+

@@ -68,6 +68,8 @@ get_taxa <- memoise(function(rank = "class", state, county) {
 # tracts <- open_dataset(glue("https://{aws_public_endpoint}/public-census/year=2022/tracts-hex-z10.parquet"))
 
 
+
+
 area_hexes <- function(state= "California", county = "Alemeda County") {
   tracts <- open_dataset(glue("https://{aws_public_endpoint}/public-census/year=2022/tracts-hex-z10.parquet"))
   county_hexes <- tracts |>
@@ -124,7 +126,7 @@ compute_data <- function(state = "California",
                 "RPL_THEME3",
                 "RPL_THEME4",
                 "FIPS", "COUNTY") |> 
-         dplyr::filter(!is.na(RPL_THEMES))
+         dplyr::filter(RPL_THEMES > 0)
 #         mutate(RPL_THEMES = ifelse(RPL_THEMES < 0, NA, RPL_THEMES))
 
   # Access CalEnviroScreen

@@ -6,7 +6,7 @@ library(mapgl)
 library(duckdbfs)
 library(shinybusy)
 source("preprocess.R")
-
+source("geolocate.R")
 
 # Define the UI
 ui <- page_sidebar(
@@ -52,20 +52,12 @@ ui <- page_sidebar(
 # Define the server
 server <- function(input, output, session) {
 
- 
-  observe(
-    print(paste("theme: ", svi_label(input$svi_theme)))
-  )
-
-
-  init <- reactiveValues(loaded = FALSE)
   # Create a dropdown for counties based on the state selected:
   output$county_selector <- renderUI({
     req(input$state)
     counties <- get_counties(input$state)
     selectInput("county", "Selected County:", choices = counties)
   })
-
 
   output$map <- renderMaplibre({
 
@@ -77,9 +69,11 @@ server <- function(input, output, session) {
 
     gdf <- combined_sf(input$state, input$county, input$rank, input$taxon)
 
-
-    vmax <- max( max(gdf[[variable]]), 1) # normalize only needed for counts, otherwise 0-1 scale
-
+    if (variable == "counts") {
+      vmax <- max( max(gdf[[variable]]), 1) # normalize only needed for counts, otherwise 0-1 scale
+    } else {
+      vmax = 1
+    }
     m <- maplibre(bounds = gdf, maxZoom = 12) |> 
       add_source(id = "richness_source", gdf) |>
       add_layer("richness_layer",
@@ -98,18 +92,21 @@ server <- function(input, output, session) {
   m
   })
 
-  observe( 
+  # Attempt to pull state/county from geocoder search
+  init <- reactiveValues(loaded = FALSE)
+  observe(
     if (init$loaded) {
       result <- input$map_geocoder$result
+
       if (!is.null(result)) {
-        if (!is.null(result$features[[1]]$properties$address$county)) {
-          county <- result$features[[1]]$properties$address$county
-          state <- result$features[[1]]$properties$address$state
-          updateTextInput(session, "state", value = state)
-          updateTextInput(session, "county", value = county)
-          print(glue::glue("{state}, {county}"))
+        res <- extract_county_state(input$map_geocoder$result)
+        if(length(res$county) > 0) {
+          updateTextInput(session, "state", value = res$state)
+          updateTextInput(session, "county", value = res$county)
+          print(glue::glue("selected {res$state}, {res$county}"))
         }
       }
+
     } else  {
       init$loaded <- TRUE
     }
@@ -121,10 +118,10 @@ server <- function(input, output, session) {
                         input$county,
                         input$rank,
                         input$taxon,
-                        input$svi_theme) |> 
+                        input$svi_theme) |>
         as_tibble() |>
         na.omit() |>
-        mutate(vulnerability = 
+        mutate(vulnerability =
                  cut(.data[[input$svi_theme]], 
                      breaks = c(0, .25, .50, .75, 1), 
                      labels = c("Q1-Lowest", "Q2-Low", "Q3-Medium", "Q4-High")
@@ -142,7 +139,7 @@ server <- function(input, output, session) {
                         as a fraction of species richness 
                         observed in the county as a whole")
 
-      
+
     }
   )
   output$plot2 <- renderPlot(
