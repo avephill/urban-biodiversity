@@ -45,6 +45,8 @@ ui <- page_sidebar(
     textInput("state", "Selected state", "California"),
     textInput("county", "Selected county", "Alameda County"),
 
+    input_switch("redlines", "Redlined Areas", value = FALSE),
+
     #selectInput("state", "Selected state:", get_states(), selected = "California"),
     #uiOutput("county_selector"),
     input_dark_mode(id = "mode"),
@@ -91,6 +93,17 @@ server <- function(input, output, session) {
       add_geolocate_control() |> 
       add_geocoder_control()
 
+    if (input$redlines) {
+      m <- m |>
+        add_fill_layer(
+          id = "redlines",
+          source = list(type = "vector",
+                        url = paste0("pmtiles://", "https://data.source.coop/cboettig/us-boundaries/mappinginequality.pmtiles")),
+          source_layer = "mappinginequality",
+          fill_opacity = 0.6,
+          fill_color = list("get", "fill")
+        ) |> add_layers_control()
+    }
 
   m
   })

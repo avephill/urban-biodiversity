@@ -1,8 +1,11 @@
 source("app/preprocess.R")
-
-
 aoi <- area_hexes(state = "California",  county = "Alameda County")
 gbif <- get_gbif(aoi)
+
+
+h0 <- get_h0(aoi)
+gbif <- paste0(glue("https://{aws_public_endpoint}/public-gbif/hex/h0="), h0, "/part0.parquet") |> open_dataset() 
+
 richness <- gbif |> gbif_richness_fraction(aoi=aoi)
 
 aws_s3_endpoint <- "minio.carlboettiger.info"
@@ -16,3 +19,23 @@ open_dataset(glue::glue("https://{aws_public_endpoint}/public-social-vulnerabili
       collect()
 })
 
+# Add basisofrecord filter
+# HUMAN_OBSERVATION   221744111
+# PRESERVED_SPECIMEN    8462730
+# MATERIAL_SAMPLE       2039603
+# OBSERVATION           2023602
+# OCCURRENCE             767165
+# MACHINE_OBSERVATION    521594
+# FOSSIL_SPECIMEN        419687
+# MATERIAL_CITATION       69018
+# LIVING_SPECIMEN         15366
+
+institutioncode <- c("all", "CLO", "iNaturalist", "other")
+
+# drop uncertainty over 1 km, but keep those as NA
+gbif  |> 
+  filter(coordinateuncertaintyinmeters < 1000 || is.na(coordinateuncertaintyinmeters)) |>
+  count(coordinateuncertaintyinmeters, sort= TRUE)  |> 
+  collect()
+
+paste0(glue("https://{aws_public_endpoint}/public-gbif/taxa.parquet")) |> open_dataset() 
