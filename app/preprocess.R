@@ -157,7 +157,17 @@ combined_sf <- memoise(function(state = "California",
       county <- "Alameda County"
     }
     combined <- compute_data(state, county, rank, taxon, svi_metric)
-    combined |> to_sf(crs = "EPSG:4326")
+    out <- combined |> to_sf(crs = "EPSG:4326")
+
+
+    ## Handle case of nrows = 0
+    if(nrow(out) < 1) {
+      warning(glue("No data found matching this query.
+                    state: {state}, county: {county}, rank: {rank},
+                    taxon: {taxon}, svi_metric: {svi_metric}"))
+    }
+
+    return(out)
   },
   cache = cache_filesystem(CACHE)
 )
@@ -175,7 +185,8 @@ viridis_pal <-
   function(column = "richness",
            n = 20, 
            min_v = 0, 
-           max_v = 1) {
+           max_v = 1) {  
+  
   pal <- viridisLite::viridis(n)
   fill_color = mapgl::step_expr(
       column = column,

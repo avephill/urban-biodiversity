@@ -75,9 +75,14 @@ server <- function(input, output, session) {
     gdf <- combined_sf(input$state, input$county, input$rank, input$taxon)
 
     if (variable == "counts") {
-      vmax <- max( max(gdf[[variable]]), 1) # normalize only needed for counts, otherwise 0-1 scale
+      map_color_column <- "log_counts"
+      gdf <- gdf |> mutate(log_counts = log(counts))
+      vmax <- max( max(gdf[[map_color_column]]), 1) # normalize only needed for counts, otherwise 0-1 scale
+      vmin <- min(gdf[[map_color_column]]) # normalize only needed for counts, otherwise 0-1 scale
     } else {
+      vmin = 0
       vmax = 1
+      map_color_column = variable
     }
     m <- maplibre(bounds = gdf, maxZoom = 12) |> 
       add_source(id = "richness_source", gdf) |>
@@ -86,7 +91,7 @@ server <- function(input, output, session) {
                 source = "richness_source",
                 tooltip = variable,
                 paint = list(
-                  "fill-color" = viridis_pal(variable, max_v = vmax),
+                  "fill-color" = viridis_pal(map_color_column, max_v = vmax),
                   "fill-opacity" = 0.4
                 ) 
       ) |> 

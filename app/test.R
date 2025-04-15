@@ -3,6 +3,7 @@ aoi <- area_hexes(state = "California",  county = "Alameda County")
 gbif <- get_gbif(aoi)
 
 
+# all gbif columns:
 h0 <- get_h0(aoi)
 gbif <- paste0(glue("https://{aws_public_endpoint}/public-gbif/hex/h0="), h0, "/part0.parquet") |> open_dataset() 
 
@@ -19,6 +20,11 @@ open_dataset(glue::glue("https://{aws_public_endpoint}/public-social-vulnerabili
       collect()
 })
 
+gbif  |> group_by(basisofrecord) |> summarise(d = mean(coordinateuncertaintyinmeters), sd = sd(coordinateuncertaintyinmeters)) |> arrange(desc(d))
+gbif  |> filter(institutioncode == "iNaturalist") |> group_by(basisofrecord) |> summarise(n = sum(is.na(coordinateuncertaintyinmeters))) |> arrange(desc(n))
+
+
+gbif  |> filter(institutioncode == "iNaturalist") |> count(basisofrecord)
 # Add basisofrecord filter
 # HUMAN_OBSERVATION   221744111
 # PRESERVED_SPECIMEN    8462730
@@ -39,3 +45,6 @@ gbif  |>
   collect()
 
 paste0(glue("https://{aws_public_endpoint}/public-gbif/taxa.parquet")) |> open_dataset() 
+
+
+taxa <- open_dataset("~/data/Taxon.tsv")
