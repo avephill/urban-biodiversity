@@ -8,13 +8,20 @@ library(shinybusy)
 source("preprocess.R")
 source("geolocate.R")
 
+
+uuid <- "6add767f-6ff7-486e-b4d5-ddce60fb8409"
+png <- glue("https://images.phylopic.org/images/{uuid}/raster/508x512.png")
+
 # Define the UI
 ui <- page_sidebar(
   fillable = FALSE, # do not squeeze to vertical screen space
   #tags$head(css),
   titlePanel("GBIF Species Richness by Census Tract"),
   shinybusy::add_busy_spinner(),
-  includeMarkdown(
+
+   layout_columns(
+    
+      includeMarkdown(
     "Use the search bar in the map to look for a city or other region.
     The app will plot species richness for the taxa selected by census
     tract as a fraction of the total species richness (for the same
@@ -24,6 +31,13 @@ ui <- page_sidebar(
     In the side panel, the app will also plot social vulnerability
     indicators by quantile vs the species
     richness observed."),
+    value_box("unique species in area", textOutput("total"), 
+              showcase = htmltools::tags$img(href = png, width=30, height=30), # fontawesome::fa("kiwi-bird")
+    ),
+    col_widths = c(8, 4),
+  ),
+
+
 
   layout_columns(
     card(maplibreOutput("map")),
@@ -45,6 +59,9 @@ ui <- page_sidebar(
     textInput("state", "Selected state", "California"),
     textInput("county", "Selected county", "Alameda County"),
 
+    selectInput("institutioncode", "data provider", providers),
+    selectInput("basisofrecord", "observation type", observation_types),
+
     input_switch("redlines", "Redlined Areas", value = FALSE),
 
     #selectInput("state", "Selected state:", get_states(), selected = "California"),
@@ -64,6 +81,19 @@ server <- function(input, output, session) {
     selectInput("county", "Selected County:", choices = counties)
   })
 
+  output$total <- renderText({
+
+    gdf <- combined_sf(input$state,
+                       input$county,
+                       input$rank,
+                       input$taxon,
+                       input$svi_theme,
+                       input$basisofrecord,
+                       input$institutioncode)
+    gdf$unique_species[1]
+
+  })
+
   output$map <- renderMaplibre({
 
     if (input$map_color == "vulnerability"){
@@ -72,7 +102,13 @@ server <- function(input, output, session) {
       variable <- input$map_color
     }
 
-    gdf <- combined_sf(input$state, input$county, input$rank, input$taxon)
+    gdf <- combined_sf(input$state,
+                       input$county,
+                       input$rank,
+                       input$taxon,
+                       input$svi_theme,
+                       input$basisofrecord,
+                       input$institutioncode)
 
     if (variable == "counts") {
       map_color_column <- "log_counts"
@@ -139,7 +175,9 @@ server <- function(input, output, session) {
                         input$county,
                         input$rank,
                         input$taxon,
-                        input$svi_theme) |>
+                        input$svi_theme,
+                        input$basisofrecord,
+                        input$institutioncode) |>
         as_tibble() |>
         na.omit() |>
         mutate(vulnerability =
@@ -169,7 +207,9 @@ server <- function(input, output, session) {
                         input$county,
                         input$rank,
                         input$taxon,
-                        input$svi_theme) |> 
+                        input$svi_theme,
+                        input$basisofrecord,
+                        input$institutioncode) |> 
         as_tibble() |>
         na.omit() |>
         mutate(vulnerability = 

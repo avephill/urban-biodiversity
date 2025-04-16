@@ -1,6 +1,7 @@
 source("app/preprocess.R")
 aoi <- area_hexes(state = "California",  county = "Alameda County")
 gbif <- get_gbif(aoi)
+richness <- gbif |> gbif_richness_fraction(aoi=aoi)
 
 
 # all gbif columns:
@@ -48,3 +49,6 @@ paste0(glue("https://{aws_public_endpoint}/public-gbif/taxa.parquet")) |> open_d
 
 
 taxa <- open_dataset("~/data/Taxon.tsv")
+
+
+

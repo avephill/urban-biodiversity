@@ -13,7 +13,9 @@ RUN install2.r --error \
     shinybusy \
     tidyverse \
     colourpicker \
-    mapgl
+    mapgl \
+    rphylopic
+
 
 RUN installGithub.r tidyverse/ellmer cboettig/duckdbfs
 

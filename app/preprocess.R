@@ -20,8 +20,14 @@ aws_s3_endpoint <- "minio.carlboettiger.info"
 
 # use to populate selctors for state and county
 
-rank <- c("kingdom", "phylum", "class", "order", "family", "genus", "species")
-svi_themes = list(
+providers <- list("all" = "all", "eBird" = "CLO", "iNaturalist" = "iNaturalist", "All others", "other")
+observation_types <- list("all" = "all",
+                          "Human observation" = "HUMAN_OBSERVATION",
+                          "Machine observation" = "MACHINE_OBSERVATION",
+                          "Specimen" = "SPECIMEN")
+
+rank <- c("all",  "kingdom", "phylum", "class", "order", "family", "genus", "species")
+svi_themes <- list(
   "Overall Social Vulnerability" = "RPL_THEMES",
   "Socio-economic status" = "RPL_THEME1",
   "Household Characteristics" = "RPL_THEME2",
@@ -89,21 +95,27 @@ get_gbif <- function(aoi) {
   # determine h0 parent cells of this area:
   h0 <- get_h0(aoi)
   tiles <- paste0(glue("https://{aws_public_endpoint}/public-gbif/hex/h0="), h0, "/part0.parquet")
-  open_dataset(tiles) |> select(kingdom, phylum, class, order, family, genus, species, h10)
+  open_dataset(tiles) |> select(kingdom, phylum, class, order, family, genus, species,
+                                basisofrecord, institutioncode, coordinateuncertaintyinmeters, h10)
 }
 
 gbif_richness_fraction <- function(gbif, aoi, rank = "class", taxon = "Aves") {
+
+  if (rank != "all") {
+    gbif <- gbif |> filter(.data[[rank]] == {taxon})
+  }
+
   species_area = aoi |>
     inner_join(gbif, 'h10') |>
-    filter(.data[[rank]] == {taxon}) |>
     count(species, FIPS, geom, name = "counts")
 
   total = species_area |> distinct(species) |> count() |> pull(n)
 
   richness = species_area |>
     group_by(FIPS, geom) |>
-    summarise(richness = n() / total, 
+    summarise(richness = n() / total,
               counts = sum(counts),
+              unique_species = total,
               .groups = "drop")
   
   richness
@@ -113,9 +125,33 @@ compute_data <- function(state = "California",
                          county = "Alameda County",
                          rank = "class",
                          taxon = "Aves",
-                         svi_metric = "RPL_THEMES") {
+                         svi_metric = "RPL_THEMES",
+                         observation_type = "all",
+                         institution = "all") {
+
+  
   aoi <- area_hexes(state, county)
   gbif <- get_gbif(aoi)
+                        
+  # Filter by observation_type groupings
+  if (observation_type != "all") {
+    if (observation_type == "SPECIMEN") {
+      gbif <- gbif |> dplyr::filter(grepl("SPECIMEN", basisofrecord))
+    } else {
+      gbif <- gbif |> dplyr::filter(basisofrecord == {observation_type})
+    }
+  }
+
+  # Filter by institution groupings
+  if (institution != "all") {
+    if (institution == "other") {
+      gbif <- gbif |> dplyr::filter(!(institutioncode %in% c("CLO", "iNaturalist")))
+
+    } else {
+      gbif <- gbif |> dplyr::filter(institutioncode == institution)
+    }
+  }
+
   richness <- gbif |> gbif_richness_fraction(aoi, rank, taxon)
 
   # Access SVI
@@ -150,13 +186,15 @@ combined_sf <- memoise(function(state = "California",
                                 county = "Alameda County",
                                 rank = "class",
                                 taxon = "Aves", 
-                                svi_metric = "RPL_THEMES")
+                                svi_metric = "RPL_THEMES",
+                                observation_type = "all",
+                                institution = "all")
   {
 
     if(is.null(county)) {
       county <- "Alameda County"
     }
-    combined <- compute_data(state, county, rank, taxon, svi_metric)
+    combined <- compute_data(state, county, rank, taxon, svi_metric, observation_type, institution)
     out <- combined |> to_sf(crs = "EPSG:4326")
 
 
