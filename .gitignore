@@ -54,4 +54,5 @@ rsconnect/
 app/cache/
 cache/
 
-*secrets*
+*secret*
+kubernetes/secret-deployment.yaml
