@@ -8,13 +8,20 @@ library(shinybusy)
 source("preprocess.R")
 source("geolocate.R")
 
+
+uuid <- "6add767f-6ff7-486e-b4d5-ddce60fb8409"
+png <- glue("https://images.phylopic.org/images/{uuid}/raster/508x512.png")
+
 # Define the UI
 ui <- page_sidebar(
   fillable = FALSE, # do not squeeze to vertical screen space
   #tags$head(css),
   titlePanel("GBIF Species Richness by Census Tract"),
   shinybusy::add_busy_spinner(),
-  includeMarkdown(
+
+   layout_columns(
+    
+      includeMarkdown(
     "Use the search bar in the map to look for a city or other region.
     The app will plot species richness for the taxa selected by census
     tract as a fraction of the total species richness (for the same
@@ -24,6 +31,13 @@ ui <- page_sidebar(
     In the side panel, the app will also plot social vulnerability
     indicators by quantile vs the species
     richness observed."),
+    value_box("unique species in area", textOutput("total"), 
+              showcase = htmltools::tags$img(href = png, width=30, height=30), # fontawesome::fa("kiwi-bird")
+    ),
+    col_widths = c(8, 4),
+  ),
+
+
 
   layout_columns(
     card(maplibreOutput("map")),
@@ -45,6 +59,11 @@ ui <- page_sidebar(
     textInput("state", "Selected state", "California"),
     textInput("county", "Selected county", "Alameda County"),
 
+    selectInput("institutioncode", "data provider", providers),
+    selectInput("basisofrecord", "observation type", observation_types),
+
+    input_switch("redlines", "Redlined Areas", value = FALSE),
+
     #selectInput("state", "Selected state:", get_states(), selected = "California"),
     #uiOutput("county_selector"),
     input_dark_mode(id = "mode"),
@@ -62,6 +81,19 @@ server <- function(input, output, session) {
     selectInput("county", "Selected County:", choices = counties)
   })
 
+  output$total <- renderText({
+
+    gdf <- combined_sf(input$state,
+                       input$county,
+                       input$rank,
+                       input$taxon,
+                       input$svi_theme,
+                       input$basisofrecord,
+                       input$institutioncode)
+    gdf$unique_species[1]
+
+  })
+
   output$map <- renderMaplibre({
 
     if (input$map_color == "vulnerability"){
@@ -70,12 +102,23 @@ server <- function(input, output, session) {
       variable <- input$map_color
     }
 
-    gdf <- combined_sf(input$state, input$county, input$rank, input$taxon)
+    gdf <- combined_sf(input$state,
+                       input$county,
+                       input$rank,
+                       input$taxon,
+                       input$svi_theme,
+                       input$basisofrecord,
+                       input$institutioncode)
 
     if (variable == "counts") {
-      vmax <- max( max(gdf[[variable]]), 1) # normalize only needed for counts, otherwise 0-1 scale
+      map_color_column <- "log_counts"
+      gdf <- gdf |> mutate(log_counts = log(counts))
+      vmax <- max( max(gdf[[map_color_column]]), 1) # normalize only needed for counts, otherwise 0-1 scale
+      vmin <- min(gdf[[map_color_column]]) # normalize only needed for counts, otherwise 0-1 scale
     } else {
+      vmin = 0
       vmax = 1
+      map_color_column = variable
     }
     m <- maplibre(bounds = gdf, maxZoom = 12) |> 
       add_source(id = "richness_source", gdf) |>
@@ -84,13 +127,24 @@ server <- function(input, output, session) {
                 source = "richness_source",
                 tooltip = variable,
                 paint = list(
-                  "fill-color" = viridis_pal(variable, max_v = vmax),
+                  "fill-color" = viridis_pal(map_color_column, max_v = vmax),
                   "fill-opacity" = 0.4
                 ) 
       ) |> 
       add_geolocate_control() |> 
       add_geocoder_control()
 
+    if (input$redlines) {
+      m <- m |>
+        add_fill_layer(
+          id = "redlines",
+          source = list(type = "vector",
+                        url = paste0("pmtiles://", "https://data.source.coop/cboettig/us-boundaries/mappinginequality.pmtiles")),
+          source_layer = "mappinginequality",
+          fill_opacity = 0.6,
+          fill_color = list("get", "fill")
+        ) |> add_layers_control()
+    }
 
   m
   })
@@ -121,7 +175,9 @@ server <- function(input, output, session) {
                         input$county,
                         input$rank,
                         input$taxon,
-                        input$svi_theme) |>
+                        input$svi_theme,
+                        input$basisofrecord,
+                        input$institutioncode) |>
         as_tibble() |>
         na.omit() |>
         mutate(vulnerability =
@@ -151,7 +207,9 @@ server <- function(input, output, session) {
                         input$county,
                         input$rank,
                         input$taxon,
-                        input$svi_theme) |> 
+                        input$svi_theme,
+                        input$basisofrecord,
+                        input$institutioncode) |> 
         as_tibble() |>
         na.omit() |>
         mutate(vulnerability = 
