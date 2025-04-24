@@ -99,8 +99,6 @@ server <- function(input, output, session) {
                        input$basisofrecord,
                        input$institutioncode)
     total <- gdf$unique_species[1]
-
-
     uuid <- tryCatch(rphylopic::get_uuid(input$taxon),
                      error = function(e) "d148ee59-7247-4d2a-a62f-77be38ebb1c7",
                      finally = "d148ee59-7247-4d2a-a62f-77be38ebb1c7")
@@ -127,36 +125,31 @@ server <- function(input, output, session) {
                        input$basisofrecord,
                        input$institutioncode)    
 
+    svi_theme <- input$svi_theme
+    gdf <- gdf |>
+     filter(between(richness, 
+                    input$richness_slider[1],
+                    input$richness_slider[2])
+           )|>
+     filter(between(.data[[svi_theme]], 
+                    input$svi_slider[1],
+                    input$svi_slider[2])
+           )
+
 
     m <- maplibre(bounds = gdf, maxZoom = 12) |>
       add_source(id = "gdf_source", gdf) |>
       add_layer("gdf_layer",
                 type = "fill",
                 source = "gdf_source",
-                tooltip = variable,
+                tooltip = "popup",
                 paint = list(
                   "fill-color" = generate_palette(gdf, variable),
                   "fill-opacity" = 0.4
                 ) 
       ) |> 
       add_geolocate_control() |> 
-      add_geocoder_control() |> 
-      set_filter("gdf_layer", 
-                 list(">=", 
-                      get_column("richness"), 
-                      input$richness_slider[1])) |> 
-      set_filter("gdf_layer", 
-                 list("<", 
-                      get_column("richness"), 
-                      input$richness_slider[2])) |>                 
-      set_filter("gdf_layer", 
-                 list(">=", 
-                      get_column(input$svi_theme), 
-                      input$svi_slider[1])) |>
-      set_filter("gdf_layer", 
-                 list("<", 
-                      get_column(input$svi_theme), 
-                      input$svi_slider[2]))                      
+      add_geocoder_control()                      
 
 
     if (input$redlines) {
@@ -174,11 +167,8 @@ server <- function(input, output, session) {
   m
   })
 
- # observeEvent(input$richness_slider, {
- #   maplibre_proxy("map") |> 
- #     set_filter("gdf_layer", 
- #                list("<=", get_column("richness"), input$richness_slider))
- # })
+
+
 
   # Attempt to pull state/county from geocoder search
   init <- reactiveValues(loaded = FALSE)
