@@ -14,13 +14,13 @@ source("geolocate.R")
 ui <- page_sidebar(
   fillable = FALSE, # do not squeeze to vertical screen space
   #tags$head(css),
-  titlePanel("GBIF Species Richness by Census Tract"),
+  titlePanel("Urban Biodiversity Explorer"),
   shinybusy::add_busy_spinner(),
 
    layout_columns(
     
       includeMarkdown(
-    "Use the search bar in the map to look for a city or other region.
+    "Use the search bar in the map to look for any US city.
     The app will plot species richness for the taxa selected by census
     tract as a fraction of the total species richness (for the same
     taxonomic group) observed in the county as a whole.  Mouse
@@ -33,7 +33,7 @@ ui <- page_sidebar(
     col_widths = c(8, 4),
   ),
 
-
+  
 
   layout_columns(
     card(maplibreOutput("map")),
@@ -42,19 +42,29 @@ ui <- page_sidebar(
     row_heights = c("700px"),
     max_height = "900px"
   ),
+
+  includeMarkdown("Adjust the filters to identify hotspots or coldspots"),
+  layout_columns(
+    sliderInput("richness_slider", "richness:", 
+                min = 0, max = 1, value = c(0,1)),
+    sliderInput("svi_slider", "vulnerability:",
+                min = 0, max = 1, value = c(0,1)),
+    col_widths = c(4, 4, 4),
+  ),
+
   card(
       card_header("Errata"),
       shiny::markdown(readr::read_file("footer.md")),
   ),
+
   sidebar = sidebar(
     open = TRUE, width = 250,
     selectInput("rank", "Select taxon rank:", rank, selected = "class"),
     textInput("taxon", "taxonomic name:", "Aves"),
-    selectInput("map_color", "Map variable:", c("richness", "counts", "vulnerability")),
+    selectInput("map_color", "Map color:", c("richness", "counts", "vulnerability")),
     selectInput("svi_theme", "Social vulnerability metric:", svi_themes),
     textInput("state", "Selected state", "California"),
     textInput("county", "Selected county", "Alameda County"),
-
     selectInput("institutioncode", "data provider", providers),
     selectInput("basisofrecord", "observation type", observation_types),
 
@@ -96,14 +106,13 @@ server <- function(input, output, session) {
                      finally = "d148ee59-7247-4d2a-a62f-77be38ebb1c7")
 
     svg <- glue("https://images.phylopic.org/images/{uuid}/vector.svg")
-    value_box("unique species in area", total,
+    value_box(glue("unique species recorded in {input$county}"), total,
               showcase = htmltools::tags$img(src = svg, width=64, height=64),
     )
     
   })
 
   output$map <- renderMaplibre({
-
     if (input$map_color == "vulnerability"){
       variable <- input$svi_theme
     } else {
@@ -116,31 +125,39 @@ server <- function(input, output, session) {
                        input$taxon,
                        input$svi_theme,
                        input$basisofrecord,
-                       input$institutioncode)
+                       input$institutioncode)    
 
-    if (variable == "counts") {
-      map_color_column <- "log_counts"
-      gdf <- gdf |> mutate(log_counts = log(counts))
-      vmax <- max( max(gdf[[map_color_column]]), 1) # normalize only needed for counts, otherwise 0-1 scale
-      vmin <- min(gdf[[map_color_column]]) # normalize only needed for counts, otherwise 0-1 scale
-    } else {
-      vmin = 0
-      vmax = 1
-      map_color_column = variable
-    }
-    m <- maplibre(bounds = gdf, maxZoom = 12) |> 
-      add_source(id = "richness_source", gdf) |>
-      add_layer("richness_layer",
+
+    m <- maplibre(bounds = gdf, maxZoom = 12) |>
+      add_source(id = "gdf_source", gdf) |>
+      add_layer("gdf_layer",
                 type = "fill",
-                source = "richness_source",
+                source = "gdf_source",
                 tooltip = variable,
                 paint = list(
-                  "fill-color" = viridis_pal(map_color_column, max_v = vmax),
+                  "fill-color" = generate_palette(gdf, variable),
                   "fill-opacity" = 0.4
                 ) 
       ) |> 
       add_geolocate_control() |> 
-      add_geocoder_control()
+      add_geocoder_control() |> 
+      set_filter("gdf_layer", 
+                 list(">=", 
+                      get_column("richness"), 
+                      input$richness_slider[1])) |> 
+      set_filter("gdf_layer", 
+                 list("<", 
+                      get_column("richness"), 
+                      input$richness_slider[2])) |>                 
+      set_filter("gdf_layer", 
+                 list(">=", 
+                      get_column(input$svi_theme), 
+                      input$vulnerability_slider[1])) |>
+      set_filter("gdf_layer", 
+                 list("<", 
+                      get_column(input$svi_theme), 
+                      input$vulnerability_slider[2]))                      
+
 
     if (input$redlines) {
       m <- m |>
@@ -156,6 +173,12 @@ server <- function(input, output, session) {
 
   m
   })
+
+ # observeEvent(input$richness_slider, {
+ #   maplibre_proxy("map") |> 
+ #     set_filter("gdf_layer", 
+ #                list("<=", get_column("richness"), input$richness_slider))
+ # })
 
   # Attempt to pull state/county from geocoder search
   init <- reactiveValues(loaded = FALSE)

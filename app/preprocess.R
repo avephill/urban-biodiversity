@@ -5,7 +5,7 @@ library(mapgl)
 library(glue)
 library(memoise)
 
-CACHE <-  tempdir() # "cache/"
+CACHE <-  "/tmp/Rtmp-urban" # "cache/"
 css <- shiny::HTML(paste0("<link rel='stylesheet' type='text/css' href='https://demos.creative-tim.com/material-dashboard/assets/css/material-dashboard.min.css?v=3.2.0'>"))
 
 
@@ -194,9 +194,12 @@ combined_sf <- memoise(function(state = "California",
     if(is.null(county)) {
       county <- "Alameda County"
     }
-    combined <- compute_data(state, county, rank, taxon, svi_metric, observation_type, institution)
-    out <- combined |> to_sf(crs = "EPSG:4326")
 
+    out <- compute_data(state, county, rank,
+                        taxon, svi_metric,
+                        observation_type, institution) |>
+           mutate(log_counts = log(counts)) |>
+           to_sf(crs = "EPSG:4326")
 
     ## Handle case of nrows = 0
     if(nrow(out) < 1) {
@@ -206,6 +209,7 @@ combined_sf <- memoise(function(state = "California",
     }
 
     return(out)
+
   },
   cache = cache_filesystem(CACHE)
 )
@@ -221,9 +225,9 @@ greens = function(column = "richness") {
 
 viridis_pal <- 
   function(column = "richness",
-           n = 20, 
-           min_v = 0, 
-           max_v = 1) {  
+           n = 20,
+           min_v = 0,
+           max_v = 1) {
   
   pal <- viridisLite::viridis(n)
   fill_color = mapgl::step_expr(
@@ -235,4 +239,19 @@ viridis_pal <-
     )
   
   fill_color
+}
+
+generate_palette <- function(gdf, variable, palette_fn = viridis_pal) {
+
+  map_color_column <- variable
+  vmin <- 0
+  vmax <- 1
+  if (variable == "counts") {
+    map_color_column <- "log_counts"
+  } 
+  
+  vmax <- max( max(gdf[[map_color_column]], na.rm=TRUE), 1)
+  vmin <- min(gdf[[map_color_column]], na.rm=TRUE)
+
+  viridis_pal(column = map_color_column, max_v = vmax,  min_v = vmin)
 }
