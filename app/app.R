@@ -152,11 +152,11 @@ server <- function(input, output, session) {
       set_filter("gdf_layer", 
                  list(">=", 
                       get_column(input$svi_theme), 
-                      input$vulnerability_slider[1])) |>
+                      input$svi_slider[1])) |>
       set_filter("gdf_layer", 
                  list("<", 
                       get_column(input$svi_theme), 
-                      input$vulnerability_slider[2]))                      
+                      input$svi_slider[2]))                      
 
 
     if (input$redlines) {
