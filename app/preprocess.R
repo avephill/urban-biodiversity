@@ -113,7 +113,8 @@ gbif_richness_fraction <- function(gbif, aoi, rank = "class", taxon = "Aves") {
 
   richness = species_area |>
     group_by(FIPS, geom) |>
-    summarise(richness = n() / total,
+    summarise(richness_n = n(),
+              richness = n() / total,
               counts = sum(counts),
               unique_species = total,
               .groups = "drop")
@@ -199,7 +200,18 @@ combined_sf <- memoise(function(state = "California",
                         taxon, svi_metric,
                         observation_type, institution) |>
            mutate(log_counts = log(counts)) |>
+           mutate(popup = paste0(
+                    "<strong>Observed species richness: </strong>", richness_n,
+                    "<br><strong>Overall Vulnerability: </strong>", round(RPL_THEMES,4),
+                    "<br><strong>Economic: </strong>", round(RPL_THEME1,4),
+                    "<br><strong>Household: </strong>", round(RPL_THEME2,4),
+                    "<br><strong>Racial/Ethnic: </strong>", round(RPL_THEME3,4),
+                    "<br><strong>Housing/Transit: </strong>", round(RPL_THEME4,4)
+                  )
+           ) |>
            to_sf(crs = "EPSG:4326")
+
+    
 
     ## Handle case of nrows = 0
     if(nrow(out) < 1) {
@@ -249,7 +261,7 @@ generate_palette <- function(gdf, variable, palette_fn = viridis_pal) {
   if (variable == "counts") {
     map_color_column <- "log_counts"
   } 
-  
+
   vmax <- max( max(gdf[[map_color_column]], na.rm=TRUE), 1)
   vmin <- min(gdf[[map_color_column]], na.rm=TRUE)
 
