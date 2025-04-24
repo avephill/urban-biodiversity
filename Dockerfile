@@ -2,6 +2,8 @@ FROM rocker/geospatial:latest
 
 WORKDIR /code
 
+RUN apt-get update && apt-get -y install librsvg2-dev
+
 RUN install2.r --error \
     bsicons \
     bslib \

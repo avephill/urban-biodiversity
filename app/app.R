@@ -9,8 +9,6 @@ source("preprocess.R")
 source("geolocate.R")
 
 
-uuid <- "6add767f-6ff7-486e-b4d5-ddce60fb8409"
-png <- glue("https://images.phylopic.org/images/{uuid}/raster/508x512.png")
 
 # Define the UI
 ui <- page_sidebar(
@@ -31,9 +29,7 @@ ui <- page_sidebar(
     In the side panel, the app will also plot social vulnerability
     indicators by quantile vs the species
     richness observed."),
-    value_box("unique species in area", textOutput("total"), 
-              showcase = htmltools::tags$img(href = png, width=30, height=30), # fontawesome::fa("kiwi-bird")
-    ),
+    uiOutput("totals"),
     col_widths = c(8, 4),
   ),
 
@@ -74,6 +70,8 @@ ui <- page_sidebar(
 # Define the server
 server <- function(input, output, session) {
 
+
+
   # Create a dropdown for counties based on the state selected:
   output$county_selector <- renderUI({
     req(input$state)
@@ -81,7 +79,7 @@ server <- function(input, output, session) {
     selectInput("county", "Selected County:", choices = counties)
   })
 
-  output$total <- renderText({
+  output$totals <- renderUI({
 
     gdf <- combined_sf(input$state,
                        input$county,
@@ -90,8 +88,18 @@ server <- function(input, output, session) {
                        input$svi_theme,
                        input$basisofrecord,
                        input$institutioncode)
-    gdf$unique_species[1]
+    total <- gdf$unique_species[1]
 
+
+    uuid <- tryCatch(rphylopic::get_uuid(input$taxon),
+                     error = function(e) "d148ee59-7247-4d2a-a62f-77be38ebb1c7",
+                     finally = "d148ee59-7247-4d2a-a62f-77be38ebb1c7")
+
+    svg <- glue("https://images.phylopic.org/images/{uuid}/vector.svg")
+    value_box("unique species in area", total,
+              showcase = htmltools::tags$img(src = svg, width=64, height=64),
+    )
+    
   })
 
   output$map <- renderMaplibre({
