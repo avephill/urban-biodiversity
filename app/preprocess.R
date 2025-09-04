@@ -7,8 +7,8 @@ library(memoise)
 library(purrr)
 library(iNEXT)
 
-# CACHE <-  "/tmp/Rtmp-urban" # "cache/"
-CACHE <- "cache/"
+CACHE <- "/tmp/Rtmp-urban" # "cache/"
+
 css <- shiny::HTML(paste0("<link rel='stylesheet' type='text/css' href='https://demos.creative-tim.com/material-dashboard/assets/css/material-dashboard.min.css?v=3.2.0'>"))
 
 
