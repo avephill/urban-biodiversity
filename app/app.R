@@ -37,7 +37,13 @@ ui <- page_sidebar(
 
   layout_columns(
     card(maplibreOutput("map")),
-    card(plotOutput("plot"), plotOutput("plot2"), plotOutput("plot3")),
+    card(
+      div(style = "height: 100%; overflow-y: scroll; padding: 15px;",
+          plotOutput("plot", height = "300px"), 
+          plotOutput("plot2", height = "300px"), 
+          plotOutput("plot3", height = "300px"),
+          plotOutput("plot4", height = "300px"))
+    ),
     col_widths = c(8, 4),
     row_heights = c("700px"),
     max_height = "900px"
@@ -283,6 +289,44 @@ server <- function(input, output, session) {
       theme(legend.position = "none") +
       labs(
         y = "sampling completeness (iNEXT)", x = "vulnerability",
+        title = "",
+        caption = ""
+      )
+  })
+
+  # richness estimate plot
+  output$plot4 <- renderPlot({
+    df <- combined_sf(
+      input$state,
+      input$county,
+      input$rank,
+      input$taxon,
+      input$svi_theme,
+      input$basisofrecord,
+      input$institutioncode
+    ) |>
+      as_tibble() |>
+      na.omit() |>
+      mutate(
+        vulnerability =
+          cut(.data[[input$svi_theme]],
+            breaks = c(0, .25, .50, .75, 1),
+            labels = c("Q1-Lowest", "Q2-Low", "Q3-Medium", "Q4-High")
+          )
+      )
+
+    df |>
+      ggplot(aes(x = vulnerability, y = richness_est, fill = vulnerability)) +
+      geom_boxplot(alpha = 0.8) +
+      # position jitter with same seed should make points and error bars line up
+      geom_point(position = position_jitter(width = 0.4, seed = 1), alpha = 0.3) +
+      geom_errorbar(aes(ymin = richness_est_lci, ymax = richness_est_uci),
+        width = 0.1, alpha = 0.3, position = position_jitter(width = 0.4, seed = 1)
+      ) +
+      theme_bw(base_size = 18) +
+      theme(legend.position = "none") +
+      labs(
+        y = "Richness estimate", x = "vulnerability",
         title = "",
         caption = ""
       )
