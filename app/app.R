@@ -38,11 +38,13 @@ ui <- page_sidebar(
   layout_columns(
     card(maplibreOutput("map")),
     card(
-      div(style = "height: 100%; overflow-y: scroll; padding: 15px;",
-          plotOutput("plot", height = "300px"), 
-          plotOutput("plot2", height = "300px"), 
-          plotOutput("plot3", height = "300px"),
-          plotOutput("plot4", height = "300px"))
+      div(
+        style = "height: 100%; overflow-y: scroll",
+        plotOutput("plot"),
+        plotOutput("plot2"),
+        plotOutput("plot3"),
+        plotOutput("plot4")
+      )
     ),
     col_widths = c(8, 4),
     row_heights = c("700px"),
@@ -67,7 +69,7 @@ ui <- page_sidebar(
     open = TRUE, width = 250,
     selectInput("rank", "Select taxon rank:", rank, selected = "class"),
     textInput("taxon", "taxonomic name:", "Aves"),
-    selectInput("map_color", "Map color:", c("richness", "counts", "vulnerability")),
+    selectInput("map_color", "Map color:", c("richness", "counts", "vulnerability", "completeness_est")),
     selectInput("svi_theme", "Social vulnerability metric:", svi_themes),
     textInput("state", "Selected state", "California"),
     textInput("county", "Selected county", "Alameda County"),
@@ -288,7 +290,7 @@ server <- function(input, output, session) {
       theme_bw(base_size = 18) +
       theme(legend.position = "none") +
       labs(
-        y = "sampling completeness (iNEXT)", x = "vulnerability",
+        y = "sampling completeness", x = "vulnerability",
         title = "",
         caption = ""
       )
@@ -319,14 +321,14 @@ server <- function(input, output, session) {
       ggplot(aes(x = vulnerability, y = richness_est, fill = vulnerability)) +
       geom_boxplot(alpha = 0.8) +
       # position jitter with same seed should make points and error bars line up
-      geom_point(position = position_jitter(width = 0.4, seed = 1), alpha = 0.3) +
+      geom_point(position = position_jitter(width = 0.4, seed = 1), alpha = 0.3, color = "darkgrey") +
       geom_errorbar(aes(ymin = richness_est_lci, ymax = richness_est_uci),
-        width = 0.1, alpha = 0.3, position = position_jitter(width = 0.4, seed = 1)
+        width = 0.1, alpha = 0.5, position = position_jitter(width = 0.4, seed = 1), color = "darkgrey"
       ) +
       theme_bw(base_size = 18) +
       theme(legend.position = "none") +
       labs(
-        y = "Richness estimate", x = "vulnerability",
+        y = "richness estimate", x = "vulnerability",
         title = "",
         caption = ""
       )

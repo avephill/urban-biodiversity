@@ -262,6 +262,8 @@ combined_sf <- memoise(function(state = "California",
            mutate(log_counts = log(counts)) |>
            mutate(popup = paste0(
                     "<strong>Observed species richness: </strong>", richness_n,
+                    "<br><strong>Estimated species richness: </strong>", richness_est,
+                    "<br><strong>Sampling completeness: </strong>", completeness_est,
                     "<br><strong>Overall Vulnerability: </strong>", round(RPL_THEMES,4),
                     "<br><strong>Economic: </strong>", round(RPL_THEME1,4),
                     "<br><strong>Household: </strong>", round(RPL_THEME2,4),
