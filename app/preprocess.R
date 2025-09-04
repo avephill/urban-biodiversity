@@ -122,6 +122,63 @@ gbif_richness_fraction <- function(gbif, aoi, rank = "class", taxon = "Aves") {
   richness
 }
 
+# There is probably some redundancy with gbif_richness_fraction, but I'll keep it for now
+gbif_completeness <- function(gbif, aoi, rank = "class", taxon = "Aves") {
+  if (rank != "all") {
+    gbif <- gbif |> filter(.data[[rank]] == {
+      taxon
+    })
+  }
+
+#' Create occupancy matrix (presence/absence: 0 or 1)
+#' Get unique species-h10 combinations and convert to binary matrix
+#' but do this for each FIPS in the county
+  gbif_fips <- aoi |>
+    inner_join(gbif, "h10")
+
+  unique_fips <- gbif_fips |>
+    distinct(FIPS) |>
+    pull(FIPS)
+
+  county_occupancy_df <- gbif_fips |>
+    distinct(species, h10, FIPS) |>
+    mutate(presence = 1) |>
+    collect()
+
+  county_occupancy_df |>
+    group_split(FIPS) |>
+    purrr::map_df(function(df) {
+      # browser()
+      unique_fips <- df |>
+        distinct(FIPS) |>
+        pull(FIPS)
+      wider_df <- df |>
+        select(-FIPS) |>
+        tidyr::pivot_wider(
+          names_from = h10,
+          values_from = presence,
+          values_fill = 0
+        ) |>
+        filter(!is.na(species)) |>
+        data.frame()
+
+      rownames(wider_df) <- wider_df$species
+      wider_df <- wider_df %>% select(-species)
+
+      est_rich <- iNEXT::ChaoRichness(list(wider_df), datatype = "incidence_raw", conf = 0.95)
+      est_rich_output <- est_rich |>
+        cbind(tibble(FIPS = unique_fips)) |>
+        rename(
+          richness_obs = Observed, richness_est = Estimator,
+          richness_est_se = `Est_s.e.`, richness_est_lci = `95% Lower`,
+          richness_est_uci = `95% Upper`
+        ) |>
+        mutate(completeness_est = richness_obs / richness_est)
+
+      est_rich_output
+    })
+}
+
 compute_data <- function(state = "California",
                          county = "Alameda County",
                          rank = "class",
@@ -154,6 +211,8 @@ compute_data <- function(state = "California",
   }
 
   richness <- gbif |> gbif_richness_fraction(aoi, rank, taxon)
+  completeness <- gbif |> gbif_completeness(aoi, rank, taxon)
+  # browser()
 
   # Access SVI
   svi <- open_dataset(glue::glue("https://{aws_public_endpoint}/public-social-vulnerability/2022/SVI2022_US_tract.parquet")) |>
@@ -172,6 +231,7 @@ compute_data <- function(state = "California",
 
   combined <- richness  |>
     left_join(svi, "FIPS")  |>
+    left_join(completeness, "FIPS", copy = TRUE) |> # This may not be efficient
   #  inner_join(ces_subset, "FIPS") |>
     mutate(vulnerability = cut(.data[[svi_metric]], breaks = c(0, .25, .50, .75, 1), 
                             labels = c("Q1-Lowest", "Q2-Low", "Q3-Medium", "Q4-High")))   # |>
@@ -211,7 +271,6 @@ combined_sf <- memoise(function(state = "California",
            ) |>
            to_sf(crs = "EPSG:4326")
 
-    
 
     ## Handle case of nrows = 0
     if(nrow(out) < 1) {
