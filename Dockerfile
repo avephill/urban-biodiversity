@@ -16,11 +16,13 @@ RUN install2.r --error \
     tidyverse \
     colourpicker \
     mapgl \
-    rphylopic
+    rphylopic \
+    purrr \ 
+    iNEXT
 
 
 RUN installGithub.r tidyverse/ellmer cboettig/duckdbfs
 
 COPY app .
 
-CMD ["R", "--quiet", "-e", "shiny::runApp(host='0.0.0.0', port=8080)"]
+CMD ["R", "--quiet", "-e", "shiny::runApp(host='0.0.0.0', port=7860)"]
