@@ -130,9 +130,9 @@ gbif_completeness <- function(gbif, aoi, rank = "class", taxon = "Aves") {
     })
   }
 
-#' Create occupancy matrix (presence/absence: 0 or 1)
-#' Get unique species-h10 combinations and convert to binary matrix
-#' but do this for each FIPS in the county
+  #' Create occupancy matrix (presence/absence: 0 or 1)
+  #' Get unique species-h10 combinations and convert to binary matrix
+  #' but do this for each FIPS in the county
   gbif_fips <- aoi |>
     inner_join(gbif, "h10")
 
