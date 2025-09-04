@@ -37,7 +37,7 @@ ui <- page_sidebar(
 
   layout_columns(
     card(maplibreOutput("map")),
-    card(plotOutput("plot"), plotOutput("plot2")),
+    card(plotOutput("plot"), plotOutput("plot2"), plotOutput("plot3")),
     col_widths = c(8, 4),
     row_heights = c("700px"),
     max_height = "900px"
@@ -252,6 +252,40 @@ server <- function(input, output, session) {
              caption = "")
 
       
+  })
+  # completeness plot
+  output$plot3 <- renderPlot({
+    df <- combined_sf(
+      input$state,
+      input$county,
+      input$rank,
+      input$taxon,
+      input$svi_theme,
+      input$basisofrecord,
+      input$institutioncode
+    ) |>
+      as_tibble() |>
+      na.omit() |>
+      mutate(
+        vulnerability =
+          cut(.data[[input$svi_theme]],
+            breaks = c(0, .25, .50, .75, 1),
+            labels = c("Q1-Lowest", "Q2-Low", "Q3-Medium", "Q4-High")
+          )
+      )
+
+    df |>
+      ggplot(aes(x = vulnerability, y = completeness_est, fill = vulnerability)) +
+      geom_boxplot(alpha = 0.5) +
+      geom_jitter(width = 0.2, alpha = 0.5) +
+      # scale_y_log10() +
+      theme_bw(base_size = 18) +
+      theme(legend.position = "none") +
+      labs(
+        y = "sampling completeness (iNEXT)", x = "vulnerability",
+        title = "",
+        caption = ""
+      )
   })
 
 #  observeEvent(input$county, {
